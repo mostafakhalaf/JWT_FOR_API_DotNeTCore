@@ -1,0 +1,106 @@
+
+1-    add Microsoft.AspNetCore.Authentication.JwtBearer package
+
+
+2- in appsettings add
+
+"JWT": {
+    "Secret": "rKBZR8rWTPQCqpLXvvqJbVMjt5SRJY8GUSgzUy4veGMPd9Kg"
+  }
+  
+  3-in startup in ConfigureServices method add
+  
+  
+  services.AddAuthentication(x =>
+{
+    x.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    x.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+}).AddJwtBearer(x =>
+            {
+                		var Key = Encoding.UTF8.GetBytes(Configuration["JWT:Key"]);
+                x.RequireHttpsMetadata = false;
+                x.SaveToken = true;
+                x.TokenValidationParameters = new TokenValidationParameters
+                {
+                    ValidateIssuerSigningKey = true,
+                    ValidateLifetime = true,
+                    ClockSkew = TimeSpan.Zero,
+                    IssuerSigningKey =Key,
+                    ValidateIssuer = false,
+                    ValidateAudience = false
+                };
+
+            });
+            
+   4-  in Configure method add this line and should befor app.map
+   
+              app.UseAuthentication(); // This need to be added	
+              app.UseAuthorization();
+              
+              
+   5-  create the return model that if success login occure that contain token as memeber of it
+   it may be like this
+   
+   
+     public class UserIdentity
+    {
+        public Guid ID { get; set; }
+        public Guid? BranchID { get; set; }
+        public Guid? CompanyID { get; set; }
+        public int Code { get; set; }
+        public string UserName { get; set; }
+        public string Email { get; set; }
+        public string MobileNo { get; set; }
+        public bool IsSuperAdmin { get; set; }
+        public string ImagePath { get; set; }
+        public Guid? RoleID { get; set; }
+        public string Token { get; set; }
+    }
+   
+   6- create token handelr that create token
+   and can be like this 
+   
+    public class TokenHandler
+    {
+        private const int EXPIRE_HOURS = 24;
+        private const int EXPIRE_HOURS_Remember = 720;
+		var Key = Encoding.UTF8.GetBytes(iconfiguration["JWT:Key"]);
+        
+            private readonly IConfiguration iconfiguration;
+              public TokenHandler(IConfiguration iconfiguration)
+              {
+                this.iconfiguration = iconfiguration;
+              }
+        public static string CreateToken(Users user, bool remember = false)
+        {
+            var tokenHandler = new JwtSecurityTokenHandler();
+            var descriptor = new SecurityTokenDescriptor
+            {
+                Subject = new ClaimsIdentity(new Claim[]
+                {
+                    new Claim(ClaimTypes.Name, user.UserName),
+                    new Claim(ClaimTypes.MobilePhone, user.MobileNo),
+                    new Claim(ClaimTypes.Email, user.Email),
+                    new Claim(ClaimTypes.PrimarySid, user.ID.ToString())
+                }),
+                Expires = DateTime.UtcNow.AddHours(remember ? EXPIRE_HOURS_Remember : EXPIRE_HOURS),
+                //Expires = DateTime.UtcNow.AddMinutes(.5),
+                SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(Key), SecurityAlgorithms.HmacSha256Signature)
+            };
+            var token = tokenHandler.CreateToken(descriptor);
+            return tokenHandler.WriteToken(token);
+        }
+    }
+   
+   7-before in controller use   [Authorize]  that authorise any request and 	[AllowAnonymous] if want to stop token about action or controller
+
+   
+   8-  in login action in controller use this  which userIdentity is the return model that create it before
+   
+               userIdentity.Token = TokenHandler.CreateToken(user);
+
+
+  9-  
+
+   
+   
